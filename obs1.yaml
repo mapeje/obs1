@@ -1,0 +1,33 @@
+esphome:
+  name: obs1
+  platform: ESP32
+  board: lolin_d32
+
+wifi:
+  ssid: "xxx"
+  password: "xxx"
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "obs1 Fallback Hotspot"
+    password: "xxx"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+api:
+  password: "xxx"
+
+ota:
+  password: "xxx"
+
+sensor:
+  - platform: dht
+    pin: GPIO2
+    temperature:
+      name: "OBS1 Temperature"
+    humidity:
+      name: "OBS1 Humidity"
+    update_interval: 60s
