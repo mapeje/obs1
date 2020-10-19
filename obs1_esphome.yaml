@@ -18,10 +18,10 @@ captive_portal:
 logger:
 
 api:
-  password: "xxx"
+#  password: "xxx"
 
 ota:
-  password: "xxx"
+#  password: "xxx"
 
 sensor:
   - platform: dht
@@ -31,3 +31,4 @@ sensor:
     humidity:
       name: "OBS1 Humidity"
     update_interval: 60s
+    model: DHT11
