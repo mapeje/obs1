@@ -1,0 +1,196 @@
+#include <Arduino.h>
+
+#define ESP32_CAN_RX_PIN GPIO_NUM_15 // This line needs to be before #include <NMEA2000_CAN.h> as to define pin used for CAN/NMEA2000 before including the library
+#define ESP32_CAN_TX_PIN GPIO_NUM_2  // This line needs to be before #include <NMEA2000_CAN.h> as to define pin used for CAN/NMEA2000 before including the library
+
+#include <NMEA2000_CAN.h>
+#include <N2kMessages.h>
+#include <N2kMessagesEnumToStr.h>
+
+
+// Include for the Display functionality
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+
+// Function declaration
+void Display_setup(void);
+void Display_welcome(void);
+void SendN2kRapidData();
+
+extern LiquidCrystal_I2C lcd;
+LiquidCrystal_I2C lcd(0x3f, 20, 4);
+
+void Display_setup(void) {
+  //pinMode(BACKLIGHT_PIN, OUTPUT);
+  //digitalWrite(BACKLIGHT_PIN, HIGH);
+  lcd.begin(20, 4, 0);
+  lcd.init();
+  lcd.backlight();
+  lcd.home();
+  lcd.display();
+}
+
+void Display_welcome(void) {
+  lcd.setCursor(0, 0);
+  lcd.print("- = Simply Magic = -");
+  lcd.setCursor(0, 1);
+  lcd.print("1: F:      RPM:     ");
+}
+
+long currentMillis = 0;
+long previousMillis = 0;
+int interval = 1000;
+float flowRate;
+float flowRateTime = 0;
+unsigned int pulse1Sec = 0; 
+unsigned int pulse1SecTime = 0; 
+double averageRPM5=0;                    // average frequency 
+
+const byte        interruptPin = 36;              // Assign the interrupt pin
+volatile uint64_t StartValue;                     // First interrupt value
+volatile uint64_t PeriodCount;                    // period in counts of 0.000001 of a second
+volatile uint64_t count;                          // counter to increase in each interupt as to compare different ways of measureing
+volatile uint64_t counttime;                    // counter to increase in each interupt in 500 us has passed since last countIRtime happend
+float             Freq;                           // frequency
+float             RPM;                            // RPM
+
+//const byte        interruptPinIR = 25;            // Assign the interrupt pin
+const byte        interruptPinIR = 13;            // Assign the interrupt pin
+volatile uint64_t StartValueIR;                   // First interrupt value
+volatile uint64_t PeriodCountIR;                  // period in counts of 0.000001 of a second
+volatile uint64_t countIR;                        // counter to increase in each interupt as to compare different ways of measureing
+volatile uint64_t countIRtime;                    // counter to increase in each interupt in 1200 us has passed since last countIRtime happend
+float             FreqIR;                         // frequency
+float             RPMIR;                          // RPM
+
+hw_timer_t * timer = NULL;                        // pointer to a variable of type hw_timer_t
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;  // synchs between maon cose and interrupt?
+
+// Digital Event Interrupt
+// Enters on change edge in this example, ignores debouncing for 500us
+//=======================================
+void IRAM_ATTR handleInterrupt()
+{
+  portENTER_CRITICAL_ISR(&mux);
+  uint64_t TempVal = timerRead(timer);        // value of timer at interrupt
+  PeriodCount = TempVal - StartValue;         // period count between changes in 0.000001 of a second
+  count++;                                    // Increase count by one to get the number of times enter the interupt function
+  if (PeriodCount > 500) {                    // if it has been 500 us or more since the last time we had a zero-crossing 
+    counttime++;                              // we count it
+    // max rpm of my vp2001 generated a 1600 usec period (at the generator W) when engine running at 3500 RPM, 
+    // 500 is a bit longer than half the pulse length  
+    StartValue = TempVal;                 // and reset the time by puting the latest reading as start for next calculation
+  }
+
+  portEXIT_CRITICAL_ISR(&mux);
+}
+
+
+
+void setup() {
+  Serial.begin(115200);
+
+  // reset counters
+  count   = 0;
+  counttime   = 0;
+
+  pinMode(interruptPin, INPUT_PULLUP);                                            // sets pin high
+  attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, CHANGE);  // attaches pin to interrupt on Change as to get two counts per period
+  timer = timerBegin(0, 80, true);                                                // this returns a pointer to the hw_timer_t global variable
+  // 0 = first timer
+  // 80 is prescaler so 80MHZ divided by 80 = 1MHZ signal ie 0.000001 of a second
+  // true - counts up
+  timerStart(timer);                                                              // starts the timer
+
+  Display_setup();
+  Display_welcome();
+
+/////////////////
+  // Set Product information
+  // Reserve enough buffer for sending all messages. This does not work on small memory devices like Uno or Mega
+  NMEA2000.SetN2kCANSendFrameBufSize(250);
+  NMEA2000.SetProductInformation("00000100", // Manufacturer's Model serial code
+                                 100, // Manufacturer's product code
+                                 "Daniel varvtal",    // Manufacturer's Model ID
+                                 "1.0.0.15 (2017-01-01)",  // Manufacturer's Software version code
+                                 "1.0.0.0 (2017-01-01)" // Manufacturer's Model version
+                                 );
+  // Set device information
+  NMEA2000.SetDeviceInformation(1, // Unique number. Use e.g. Serial number.
+                                132, // Device function=Analog to NMEA 2000 Gateway. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                25, // Device class=Inter/Intranetwork Device. See codes on  http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                2046 // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf                               
+                               );
+  // Uncomment 3 rows below to see, what device will send to bus                           
+  // already done in the setup-function in tha main, Serial.begin(115200);
+  NMEA2000.SetForwardStream(&Serial);  // PC output on due programming port
+  NMEA2000.SetForwardType(tNMEA2000::fwdt_Text); // Show in clear text. Leave uncommented for default Actisense format.
+  NMEA2000.SetForwardOwnMessages();
+
+  // If you also want to see all traffic on the bus use N2km_ListenAndNode instead of N2km_NodeOnly below
+  //NMEA2000.SetMode(tNMEA2000::N2km_NodeOnly,22);
+  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode,22); 
+  NMEA2000.EnableForward(false); // Disable all msg forwarding to USB (=Serial)
+
+  NMEA2000.Open();
+}
+
+void loop() {
+
+  if (currentMillis - previousMillis + 500 > interval) {
+
+    portENTER_CRITICAL(&mux);
+    Freq  = 1000000.00 / PeriodCount;                     // PeriodCount in 0.000001 of a second, 2 pulses per revolition in the motor
+    RPM   = Freq * 60.0;
+    portEXIT_CRITICAL(&mux);
+    Serial.print("Frequency (motor)   ");
+    Serial.println(Freq, 2);
+    lcd.setCursor(0, 1);
+    lcd.print("1: F: " + (String) Freq);
+  }
+
+  currentMillis = millis();
+  if (currentMillis - previousMillis > interval) {
+
+    pulse1Sec = counttime;
+    count = 0;
+    counttime = 0;
+    flowRate = ((1000.0 / (millis() - previousMillis)) * pulse1Sec);
+
+    averageRPM5   = ((4.0  * averageRPM5)  + (flowRate*5.66)) / 5.0;
+//    averageRPM10  = ((9.0  * averageRPM10) + Freg) / 10.0;
+//    averageRPM20  = ((19.0 * averageRPM20) + Freg) / 20.0;
+    if (pulse1Sec < 5) {
+      averageRPM5  = 0.0;
+//      averageRPM10 = 0.0;
+//      averageRPM20 = 0.0;
+    }
+
+    Serial.print("Frequency (Count)   ");
+    Serial.println(flowRate, 2);
+    lcd.setCursor(0, 2); lcd.print("                    "); lcd.setCursor(0, 2); // clear line 3
+    lcd.print("C:" + (String) pulse1Sec );
+    lcd.setCursor(0, 3); lcd.print("                    "); lcd.setCursor(0, 3); // clear line 4
+    lcd.print("F: " + (String) flowRate );
+  }
+
+  //Send NMEA2000
+  SendN2kRapidData();
+  NMEA2000.ParseMessages();
+
+}
+
+#define RapidDataUpdatePeriod 167 // Some strange periot to cause Slow and rapid to run unsync.
+
+void SendN2kRapidData() {
+  static unsigned long RapidDataUpdated=millis();
+  tN2kMsg N2kMsg;
+
+  if ( RapidDataUpdated+RapidDataUpdatePeriod<millis() ) {
+    RapidDataUpdated=millis();
+
+    Serial.println("RPM: " + (String) averageRPM5); 
+    SetN2kEngineParamRapid(N2kMsg,0, (double) averageRPM5); 
+    NMEA2000.SendMsg(N2kMsg);
+  }
+}
