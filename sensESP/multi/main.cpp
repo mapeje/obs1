@@ -38,7 +38,7 @@ ReactESP app([]() {
   DallasTemperatureSensors* dts = new DallasTemperatureSensors(4);
 
   // Define how often SensESP should read the sensor(s) in milliseconds [updates every 5s]
-  uint read_delay = 5000;
+  uint engine_read_delay = 5000;
 
   // Below are temperatures sampled and sent to Signal K server
   // To find valid Signal K Paths that fits your need you look at this link:
@@ -46,7 +46,7 @@ ReactESP app([]() {
 
   // Measure coolant temperature
   auto* coolant_temp =
-      new OneWireTemperature(dts, read_delay, "/coolantTemperature/oneWire");
+      new OneWireTemperature(dts, engine_read_delay, "/coolantTemperature/oneWire");
 
   coolant_temp->connect_to(new Linear(1.0, 0.0, "/coolantTemperature/linear"))
       ->connect_to(
@@ -64,14 +64,14 @@ ReactESP app([]() {
   // bmp280->adafruit_bmp280->setSampling(); // pass in the parameters you want
 
   // Define the read_delays you're going to use:
-  const uint read_delay = 1000;            // once per second
+  const uint env_read_delay = 1000;            // once per second
   const uint pressure_read_delay = 60000;  // once per minute
 
   // Create a BMP280Value, which is used to read a specific value from the
   // BMP280, and send its output to Signal K as a number (float). This one is for
   // the temperature reading.
   auto* bmp_temperature =
-      new BMP280Value(bmp280, temperature, read_delay, "/Outside/Temperature");
+      new BMP280Value(bmp280, temperature, env_read_delay, "/Outside/Temperature");
 
   bmp_temperature->connect_to(
       new SKOutputNumber("environment.outside.temperature"));
