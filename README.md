@@ -1,4 +1,4 @@
 # obs1
-ESP32 sensor
+Lolin D32 ESP32 sensor
 
 
