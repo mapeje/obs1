@@ -25,7 +25,7 @@
 
 #include <Wire.h>
 
-#define BMP_SDA 21
+#define BMP_SDA 2
 #define BMP_SCL 22
 #include <Adafruit_BMP280.h>  // Install Adafruit BMP280 library!!!
 Adafruit_BMP280 bmp; // I2C 
@@ -33,7 +33,7 @@ Adafruit_BMP280 bmp; // I2C
 // Connect VIN of the BMP280 sensor to 3.3V (NOT 5.0V!)
 // Connect GND to Ground
 // Connect SCL GPIO 22
-// Connect SDA GPIO 21
+// Connect SDA GPIO 2 (21)
 
 #define ENABLE_DEBUG_LOG 0 // Debug log
 
@@ -87,11 +87,11 @@ void setup() {
   for (i = 0; i < 6; i++) id += (chipid[i] << (7 * i));
 
   // Set product information
-  NMEA2000.SetProductInformation("1", // Manufacturer's Model serial code
+  NMEA2000.SetProductInformation("246F28A4AE1C", // Manufacturer's Model serial code
                                  100, // Manufacturer's product code
-                                 "My Sensor Module",  // Manufacturer's Model ID
-                                 "1.0.2.25 (2019-07-07)",  // Manufacturer's Software version code
-                                 "1.0.2.0 (2019-07-07)" // Manufacturer's Model version
+                                 "obs1",  // Manufacturer's Model ID
+                                 "0.0.0.1 (2020-12-05)",  // Manufacturer's Software version code
+                                 "0.0.1.0 (2020-12-05)" // Manufacturer's Model version
                                 );
   // Set device information
   NMEA2000.SetDeviceInformation(id, // Unique number. Use e.g. Serial number.
