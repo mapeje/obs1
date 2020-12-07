@@ -1,8 +1,14 @@
+// From https://github.com/ttlappalainen/NMEA2000/tree/master/Examples/ActisenseListenerSender
 // Demo: NMEA2000 library. Bus listener and sender. 
 //   Sends all bus data to serial in Actisense format.
 //   Send all data received from serial in Actisense format to the N2kBus.
 //   Use this e.g. with NMEA Simulator (see. http://www.kave.fi/Apps/index.html) to send simulated data to the bus.
-//   I have plans to add receiving functionality and data forwarding to NMEA Simulator. Meanwhile you can define
+
+//   Use with Openplotter: 1. Connect ESP to RPI/OP with USB; 2. Add serial device as NMEA2000 and Add to CAN bus with 115000 baud. 
+//   3. N2K should come into SignalK. 4. Use signalk-to-nmea2000 plugin to send N2K messages back to NMEA network. 5. Use 
+//   @signalk/simulatorplugin to simulate data ("environment.water.temperature" from "source: simulator.0"
+//   Make sure using "NMEA 2000 Source: Actisense NGT-1 (canboatjs)" in SignalK
+
 //   other stream to different port so that you can send data with NMEA Simulator and listen it on other port with 
 //   Actisense NMEA Reader.
 
