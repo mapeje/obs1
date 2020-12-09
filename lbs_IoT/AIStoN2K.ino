@@ -195,7 +195,7 @@ void SendN2kMisc() {
 // A Class A AIS unit broadcasts the following information every 2 to 10 seconds while underway, and every 3 minutes while at anchor at a power level of 12.5 watts.
 // MessageID 1, 2 or 3
 
-  SetN2kAISClassAPosition(N2kMsg, 1, tN2kAISRepeat::N2kaisr_First, 705686783, 55.577521, 12.816374, 1, 1, 1, DegToRad(20), 23,DegTRad(30), DegToRad(-10), tN2kAISNavStatus::N2kaisns_Under_Way_Motoring);  // MessageID=1, 23 m/s SOG
+  SetN2kAISClassAPosition(N2kMsg, 1, tN2kAISRepeat::N2kaisr_First, 705686783, 55.577521, 12.816374, 1, 1, 1, DegToRad(20), 23,DegToRad(30), DegToRad(-10), tN2kAISNavStatus::N2kaisns_Under_Way_Motoring);  // MessageID=1, 23 m/s SOG
   delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
  
   SetN2kAISClassAPosition(N2kMsg, 1, tN2kAISRepeat::N2kaisr_First, 706647389, 55.675523, 13.056202, true, true, 1, DegToRad(2), 20, DegToRad(30), DegToRad(10), tN2kAISNavStatus::N2kaisns_At_Anchor);  // Martin parkerad på piren
@@ -241,7 +241,7 @@ void SendN2kMisc() {
   SetN2kAISClassBStaticPartA(N2kMsg, 24, tN2kAISRepeat::N2kaisr_First, 705686783,  "SIMPLY MAGIC");
   delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
 
-  SetN2kAISClassBStaticPartB(N2kMsg, 24, tN2kAISRepeat::N2kaisr_First, 705686783, 36, "MAXI”, "SIMPLY MAGIC", 8.0, 3.0, 4.0, 2.0, 826510421);  // Simply Magic MMSI: 826510421, Call sign SF2692
+  SetN2kAISClassBStaticPartB(N2kMsg, 24, tN2kAISRepeat::N2kaisr_First, 705686783, 36, "MAXI", "SIMPLY MAGIC", 8.0, 3.0, 4.0, 2.0, 826510421);  // Simply Magic MMSI: 826510421, Call sign SF2692
   delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
    
     //AIS
