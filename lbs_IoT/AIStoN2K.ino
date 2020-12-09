@@ -188,31 +188,61 @@ void SendN2kMisc() {
     SetN2kTransmissionParameters(N2kMsg,0,N2kTG_Forward,750000, CToKelvin(65.5),true,false,true);
     delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
 
+//AIS
+    
+// MesssageID set according to information found in https://github.com/ronzeiller/NMEA0183-AIS/blob/master/NMEA0183AISMessages.cpp
+// För mer detaljer se https://www.navcen.uscg.gov/?pageName=AISMessagesA
+// A Class A AIS unit broadcasts the following information every 2 to 10 seconds while underway, and every 3 minutes while at anchor at a power level of 12.5 watts.
+// MessageID 1, 2 or 3
 
-    //AIS
-    
-    //ClassA
-    
-    SetN2kAISClassAPosition(N2kMsg, 1, tN2kAISRepeat::N2kaisr_First, 706647389, 55.675523, 13.056202, true, true, 1, DegToRad(15), 21, DegToRad(25), DegToRad(100), tN2kAISNavStatus::N2kaisns_At_Anchor); //21 m/s,  // Martin parkerad på piren
-    delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);    
+  SetN2kAISClassAPosition(N2kMsg, 1, tN2kAISRepeat::N2kaisr_First, 123456789, 55.577521, 12.816374, 1, 1, 1, DegToRad(20), 23,DegTRad(30), DegToRad(-10), tN2kAISNavStatus::N2kaisns_Under_Way_Motoring);  // MessageID=1, 23 m/s SOG
+  delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
+ 
+  SetN2kAISClassAPosition(N2kMsg, 1, tN2kAISRepeat::N2kaisr_First, 706647389, 55.675523, 13.056202, true, true, 1, DegToRad(2), 20, DegToRad(30), DegToRad(10), tN2kAISNavStatus::N2kaisns_At_Anchor);  // Martin parkerad på piren
+  delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
 
-    SetN2kAISClassAStatic(N2kMsg, 5, tN2kAISRepeat::N2kaisr_First,// MessageID 5 (1)
-      706647389, 1234567, "SE+46", //IMO nummer 1234567? ; VHF Call sign
-      "CAMOMILLA", 37, 8.60, 2.8, 4.3, 1.5,
-      18250, 43200.0, 2.0, "Lomma", // ETAdate=50*365 , ETAtime=12*60*60, 1.0, "Lomma",
-      tN2kAISVersion::N2kaisv_ITU_R_M_1371_1,
-      tN2kGNSStype::N2kGNSSt_GPS,
-      tN2kAISDTE::N2kaisdte_Ready,
-      tN2kAISTranceiverInfo::N2kaisti_Channel_B_VDL_transmission);
+// Daniel: Borde fungera och ge information kring bla namn
+// In addition, the Class A AIS unit broadcasts the following information every 6 minutes. 
+
+  SetN2kAISClassAStatic(N2kMsg, 5, tN2kAISRepeat::N2kaisr_First,     // MessageID=5
+    123456789, 1234567, “SE+46”,
+    “MAGIC SIMPLY”, 37, 8.0, 3.0, 4.0, 2.0,   // 37 Pleasure craft
+    18250, 43200.0, 2.0, “Lomma”, // ETAdate=50*365 , ETAtime=12*60*60, 2.0, “Lomma”,
+    tN2kAISVersion::N2kaisv_ITU_R_M_1371_1,
+    tN2kGNSStype::N2kGNSSt_GPS,
+    tN2kAISDTE::N2kaisdte_Ready,
+    tN2kAISTranceiverInfo::N2kaisti_Channel_B_VDL_transmission);
     delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
-     
-    //Class B
-      
-    SetN2kAISClassBPosition(N2kMsg, 18, tN2kAISRepeat:: N2kaisr_First, 705686783, 55.675500, 13.068821, true, true, 1, DegToRad(90), 4, DegToRad(180), tN2kAISUnit::N2kaisunit_ClassB_SOTDMA, true, false, false, true, tN2kAISMode::N2kaismode_Autonomous, true); // Daniel i gästhamnen
+
+   SetN2kAISClassAStatic(N2kMsg, 5, tN2kAISRepeat::N2kaisr_First,     // MessageID=5
+    706647389, 7654321, “SE+46”,
+    “CAMOMILLA”, 37, 8.6, 3.0, 4.3, 1.5,   // 37 Pleasure craft
+    18250, 43200.0, 2.0, “Lomma”, // ETAdate=50*365 , ETAtime=12*60*60, 2.0, “Lomma”,
+    tN2kAISVersion::N2kaisv_ITU_R_M_1371_1,
+    tN2kGNSStype::N2kGNSSt_GPS,
+    tN2kAISDTE::N2kaisdte_Ready,
+    tN2kAISTranceiverInfo::N2kaisti_Channel_B_VDL_transmission);
     delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
-    
-    SetN2kAISClassBStaticPartA(N2kMsg, 24, tN2kAISRepeat::N2kaisr_First, 705686783,  "SE+46705686783");// MessageID 24 (1)
-    delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
+
+// Daniel: Denna borde fungera för position för Class B
+// https://www.navcen.uscg.gov/?pageName=AISMessagesB
+
+  SetN2kAISClassBPosition(N2kMsg, 18, tN2kAISRepeat:: N2kaisr_First, 705686783, 55.675500, 13.068821, true, true, 1, DegToRad(90), 4, DegToRad(180), tN2kAISUnit::N2kaisunit_ClassB_SOTDMA, true, false, false, true, tN2kAISMode::N2kaismode_Autonomous, true); // Daniel i gästhamnen
+// finns även MESSAGE 19: EXTENDED CLASS B EQUIPMENT POSITION REPORT
+  delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
+
+// Daniel: Dessa går att testa men jag tror det finns en bug i timos bibliotek for MessageID=24 som gör att de inte kommer funka
+//SetN2kAISClassBStaticPartA(N2kMsg, 24, tN2kAISRepeat:: N2kaisr_First, 705686783,  “SE+46705686783”);
+//delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
+
+  SetN2kAISClassBStaticPartB(N2kMsg, 24, tN2kAISRepeat::N2kaisr_First, 705686783, 36, “MAXI”, “SE+46705686783”, 8.0, 3.0, 4.0, 2.0, 826510421);  // Simply Magic MMSI: 826510421, Call sign SF2692
+  delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
+
+  SetN2kAISClassBStaticPartA(N2kMsg, 24, tN2kAISRepeat:: N2kaisr_First, 705686783,  “SIMPLY MAGIC”);
+  delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
+
+  SetN2kAISClassBStaticPartB(N2kMsg, 24, tN2kAISRepeat::N2kaisr_First, 705686783, 36, “MAXI”, ““SIMPLY MAGIC”, 8.0, 3.0, 4.0, 2.0, 826510421);  // Simply Magic MMSI: 826510421, Call sign SF2692
+  delay(DelayBetweenSend); NMEA2000.SendMsg(N2kMsg);
    
     //AIS
 
