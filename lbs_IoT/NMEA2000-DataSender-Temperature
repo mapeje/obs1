@@ -1,0 +1,370 @@
+/*
+  This code is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+  This code is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
+// Based initially on Version 0.6, 04.08.2020, AK-Homberger
+// Modified by handle only temperature sensors (several), 2020-11-25, Rikard Hult
+
+#define ESP32_CAN_RX_PIN GPIO_NUM_15 // This line needs to be before #include <NMEA2000_CAN.h> as to define pin used for CAN/NMEA2000 before including the library
+#define ESP32_CAN_TX_PIN GPIO_NUM_2  // This line needs to be before #include <NMEA2000_CAN.h> as to define pin used for CAN/NMEA2000 before including the library
+
+#include <Arduino.h>
+#include <Preferences.h>
+#include <NMEA2000_CAN.h>  // This will automatically choose right CAN library and create suitable NMEA2000 object
+#include <memory>
+#include <N2kMessages.h>
+#include <DallasTemperature.h>
+
+// To store last Node Address
+int NodeAddress;
+
+// Nonvolatile storage on ESP32 - To store LastDeviceAddress
+Preferences preferences;
+
+// Set the information for other bus devices, which messages we support
+const unsigned long TransmitMessages[] PROGMEM = {130311L, // Temperature  (or alternatively 130310L(outside), 130312L or 130316L)
+                                                  0
+                                                 };
+
+// Data wire for temperature (Dallas DS18B20) is plugged into GPIO 13 on the ESP32
+#define ONE_WIRE_BUS 13
+
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+
+// Pass our oneWire reference to Dallas Temperature.
+DallasTemperature sensors(&oneWire);
+
+// Device address of the active DS18B20 temperature sensor used to measure the corresponding temperature.
+// Uncomment the temperature sensors that you want to use.
+// In this example only the DeviceAddress for the SeaTemperature sensor is active. Currently all DeviceAddress uses the same temperature sensor address.
+DeviceAddress SeaTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress OutsideTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress InsideTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress EngineRoomTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress MainCabinTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress LiveWellTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress BaitWellTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress RefridgerationTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress HeatingSystemTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress DewPointTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress ApparentWindChillTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress TheoreticalWindChillTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress HeatIndexTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress FreezerTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+//DeviceAddress ExhaustGasTemperatureAddr = {0x28, 0xAA, 0x61, 0x7A, 0x16, 0x13, 0x2, 0x7C};
+
+// Send time offsets
+#define TEMP_SEND_OFFSET 0
+
+// Time between CAN Messages sent
+#define SLOW_DATA_UPDATE_PERIOD 10000
+
+// Global Data for all temperature types defined by enum tN2kTempSource in N2kTypes.h in the NMEA2000 library.
+// Uncomment the temperature sensors that you want to use. 
+double SeaTemperature = 0;
+//double OutsideTemperature = 0;
+//double InsideTemperature = 0;
+//double EngineRoomTemperature = 0;
+//double MainCabinTemperature = 0;
+//double LiveWellTemperature = 0;
+//double BaitWellTemperature = 0;
+//double RefridgerationTemperature = 0;
+//double HeatingSystemTemperature = 0;
+//double DewPointTemperature = 0;
+//double ApparentWindChillTemperature = 0;
+//double TheoreticalWindChillTemperature = 0;
+//double HeatIndexTemperature = 0;
+//double FreezerTemperature = 0;
+//double ExhaustGasTemperature = 0;
+
+// Task handle for OneWire read (Core 0 on ESP32)
+TaskHandle_t Task1;
+
+void setup() 
+{
+  uint8_t chipid[6];
+  uint32_t id = 0;
+  int i = 0;
+
+  // Init USB serial port
+  Serial.begin(115200);
+
+  // Start OneWire
+  sensors.begin();
+
+  // Reserve enough buffer for sending all messages. This does not work on small memory devices like Uno or Mega
+  NMEA2000.SetN2kCANMsgBufSize(8);
+  NMEA2000.SetN2kCANReceiveFrameBufSize(250);
+  NMEA2000.SetN2kCANSendFrameBufSize(250);
+
+  // Get the MAC address of the ESP32
+  esp_efuse_mac_get_default(chipid);
+  Serial.printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",chipid[0], chipid[1], chipid[2], chipid[3], chipid[4], chipid[5]);
+  // Create an unique id number based on the MAC address.
+  for (i = 0; i < 6; i++) id += (chipid[i] << (7 * i));
+
+  // Set product information
+  NMEA2000.SetProductInformation("1", // Manufacturer's Model serial code
+                                 100, // Manufacturer's product code
+                                 "My Sensor Module",  // Manufacturer's Model ID
+                                 "1.0.2.25 (2019-07-07)",  // Manufacturer's Software version code
+                                 "1.0.2.0 (2019-07-07)" // Manufacturer's Model version
+                                );
+  // Set device information
+  NMEA2000.SetDeviceInformation(id, // Unique number. Use e.g. Serial number.
+                                132, // Device function=Analog to NMEA 2000 Gateway. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                25, // Device class=Inter/Intranetwork Device. See codes on  http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                2046 // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
+                               );
+
+  // If you also want to see all traffic on the bus use N2km_ListenAndNode instead of N2km_NodeOnly below
+  NMEA2000.SetForwardType(tNMEA2000::fwdt_Text); // Show in clear text. Leave uncommented for default Actisense format.
+
+  preferences.begin("nvs", false);                          // Open nonvolatile storage (nvs)
+  NodeAddress = preferences.getInt("LastNodeAddress", 33);  // Read stored last NodeAddress, default 33
+  preferences.end();
+  Serial.printf("NodeAddress=%d\n", NodeAddress);
+
+  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, NodeAddress);
+
+  NMEA2000.ExtendTransmitMessages(TransmitMessages);
+
+  NMEA2000.Open();
+
+  // Create task for core 0, loop() runs on core 1
+  xTaskCreatePinnedToCore(
+    GetTemperature, /* Function to implement the task */
+    "Task1", /* Name of the task */
+    10000,  /* Stack size in words */
+    NULL,  /* Task input parameter */
+    0,  /* Priority of the task */
+    &Task1,  /* Task handle. */
+    0); /* Core where the task should run */
+
+  delay(200);
+}
+
+// This task runs isolated on core 0 because sensors.requestTemperatures() is slow and blocking for about 750 ms
+void GetTemperature(void * parameter) 
+{
+  // Uncomment the temperature sensors that you want to use.
+  // No need to use a separate temporary variable for each temperature sensor, but kept for now.
+  double seaTemp = 0;
+  //double outsideTemp = 0;
+  //double insideTemp = 0;
+  //double engineRoomTemp = 0;
+  //double mainCabinTemp = 0;
+  //double liveWellTemp = 0;
+  //double baitWellTemp = 0;
+  //double refridgerationTemp = 0;
+  //double heatingSystemTemp = 0;
+  //double dewPointTemp = 0;
+  //double apparentWindChillTemp = 0;
+  //double theoreticalWindChillTemp = 0;
+  //double heatIndexTemp = 0;
+  //double freezerTemp = 0;
+  //double exhaustGasTemp = 0;
+ 
+  for (;;) 
+  {
+    // Send the command to get temperatures
+    sensors.requestTemperatures();
+    vTaskDelay(100);
+
+    // Get the temperature in Celcius of the active temperature sensors. In this example only SeaTemperature.
+    // Uncomment the temperature sensors that you want to use.  
+    seaTemp = sensors.getTempC(SeaTemperatureAddr);
+    if (seaTemp != DEVICE_DISCONNECTED_C)
+    {
+      SeaTemperature = seaTemp;
+    }
+    vTaskDelay(100);
+    
+    /*outsideTemp = sensors.getTempC(OutsideTemperatureAddr);
+    if (outsideTemp != DEVICE_DISCONNECTED_C)
+    {
+      OutsideTemperature = outsideTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*insideTemp = sensors.getTempC(InsideTemperatureAddr);
+    if (insideTemp != DEVICE_DISCONNECTED_C)
+    {
+      InsideTemperature = insideTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*engineRoomTemp = sensors.getTempC(EngineRoomTemperatureAddr);
+    if (engineRoomTemp != DEVICE_DISCONNECTED_C)
+    {
+      EngineRoomTemperature = engineRoomTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*mainCabinTemp = sensors.getTempC(MainCabinTemperatureAddr);
+    if (mainCabinTemp != DEVICE_DISCONNECTED_C)
+    {
+      MainCabinTemperature = mainCabinTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*liveWellTemp = sensors.getTempC(LiveWellTemperatureAddr);
+    if (liveWellTemp != DEVICE_DISCONNECTED_C)
+    {
+      LiveWellTemperature = liveWellTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*baitWellTemp = sensors.getTempC(BaitWellTemperatureAddr);
+    if (baitWellTemp != DEVICE_DISCONNECTED_C)
+    {
+      BaitWellTemperature = baitWellTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*refridgerationTemp = sensors.getTempC(RefridgerationTemperatureAddr);
+    if (refridgerationTemp != DEVICE_DISCONNECTED_C)
+    {
+      RefridgerationTemperature = refridgerationTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*heatingSystemTemp = sensors.getTempC(HeatingSystemTemperatureAddr);
+    if (heatingSystemTemp != DEVICE_DISCONNECTED_C)
+    {
+      HeatingSystemTemperature = heatingSystemTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*dewPointTemp = sensors.getTempC(DewPointTemperatureAddr);
+    if (dewPointTemp != DEVICE_DISCONNECTED_C)
+    {
+      DewPointTemperature = dewPointTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*apparentWindChillTemp = sensors.getTempC(ApparentWindChillTemperatureAddr);
+    if (apparentWindChillTemp != DEVICE_DISCONNECTED_C)
+    {
+      ApparentWindChillTemperature = apparentWindChillTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*theoreticalWindChillTemp = sensors.getTempC(TheoreticalWindChillTemperatureAddr);
+    if (theoreticalWindChillTemp != DEVICE_DISCONNECTED_C)
+    {
+      TheoreticalWindChillTemperature = theoreticalWindChillTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*heatIndexTemp = sensors.getTempC(HeatIndexTemperatureAddr);
+    if (heatIndexTemp != DEVICE_DISCONNECTED_C)
+    {
+      HeatIndexTemperature = heatIndexTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*freezerTemp = sensors.getTempC(FrezzerTemperatureAddr);
+    if (frezzerTemp != DEVICE_DISCONNECTED_C)
+    {
+      FrezzerTemperature = frezzerTemp;
+    }
+    vTaskDelay(100);*/
+    
+    /*exhaustGasTemp = sensors.getTempC(ExhaustGasTemperatureAddr);
+    if (exhaustGasTemp != DEVICE_DISCONNECTED_C)
+    {
+      ExhaustGasTemperature = exhaustGasTemp;
+    }
+    vTaskDelay(100);
+    */
+  }
+}
+
+bool IsTimeToUpdate(unsigned long NextUpdate) 
+{
+  return (NextUpdate < millis());
+}
+
+unsigned long InitNextUpdate(unsigned long Period, unsigned long Offset = 0) 
+{
+  return millis() + Period + Offset;
+}
+
+void SetNextUpdate(unsigned long &NextUpdate, unsigned long Period) 
+{
+  while (NextUpdate < millis()) NextUpdate += Period;
+}
+
+void SendN2kTemperatureSource(tN2kTempSource TempSource, double Temperature) 
+{
+  static unsigned long SlowDataUpdated = InitNextUpdate(SLOW_DATA_UPDATE_PERIOD, TEMP_SEND_OFFSET);
+  tN2kMsg N2kMsg;
+
+  if (IsTimeToUpdate(SlowDataUpdated)) {
+    SetNextUpdate(SlowDataUpdated, SLOW_DATA_UPDATE_PERIOD);
+
+    Serial.printf("Temperature: %3.0f °C \n", Temperature);
+
+    // Select the right PGN for your MFD and set the PGN value also in "TransmitMessages[]"
+
+    SetN2kEnvironmentalParameters(N2kMsg, 0, TempSource, CToKelvin(Temperature),           // PGN130311, uncomment the PGN to be used
+                                  N2khs_Undef, N2kDoubleNA, N2kDoubleNA);
+
+    // SetN2kTemperature(N2kMsg, 0, 0, TempSource, CToKelvin(Temperature), N2kDoubleNA);   // PGN130312, uncomment the PGN to be used
+
+    // SetN2kTemperatureExt(N2kMsg, 0, 0, TempSource, CToKelvin(Temperature), N2kDoubleNA); // PGN130316, uncomment the PGN to be used
+
+    NMEA2000.SendMsg(N2kMsg);
+  }
+}
+
+void loop() 
+{
+  // Send Nk2 message for the each active temperature sensor. In this example only SeaTemperature.
+  // OutsideEnvironmentalParameters (PGN130310) sends WaterTemperature and OutsideAmbientAirTemperature, but that message is not implemented in this sketch. 
+  
+  SendN2kTemperatureSource(N2kts_SeaTemperature, SeaTemperature); // Could/should probably be sent also with PGN130310, but not implemented. 
+  //SendN2kTemperatureSource(N2kts_OutsideTemperature, OutsideTemperature); // Could/should probably be sent also with PGN130310, but not implemented.
+  //SendN2kTemperatureSource(N2kts_InsideTemperature, InsideTemperature);
+  //SendN2kTemperatureSource(N2kts_EngineRoomTemperature, EngineRoomTemperature);
+  //SendN2kTemperatureSource(N2kts_MainCabinTemperature, MainCabinTemperature);
+  //SendN2kTemperatureSource(N2kts_LiveWellTemperature, LiveWellTemperature);
+  //SendN2kTemperatureSource(N2kts_BaitWellTemperature, BaitWellTemperature);
+  //SendN2kTemperatureSource(N2kts_RefridgerationTemperature, RefridgerationTemperature);
+  //SendN2kTemperatureSource(N2kts_HeatingSystemTemperature, HeatingSystemTemperature);
+  //SendN2kTemperatureSource(N2kts_DewPointTemperature, DewPointTemperature);
+  //SendN2kTemperatureSource(N2kts_ApparentWindChillTemperature, ApparentWindChillTemperature);
+  //SendN2kTemperatureSource(N2kts_TheoreticalWindChillTemperature, TheoreticalWindChillTemperature);
+  //SendN2kTemperatureSource(N2kts_HeatIndexTemperature, HeatIndexTemperature);
+  //SendN2kTemperatureSource(N2kts_FreezerTemperature, FreezerTemperature);
+  //SendN2kTemperatureSource(N2kts_ExhaustGasTemperature, ExhaustGasTemperature);
+
+  NMEA2000.ParseMessages();
+  
+  int SourceAddress = NMEA2000.GetN2kSource();
+  if (SourceAddress != NodeAddress) 
+  { // Save potentially changed Source Address to NVS memory
+    preferences.begin("nvs", false);
+    preferences.putInt("LastNodeAddress", SourceAddress);
+    preferences.end();
+    Serial.printf("Address Change: New Address=%d\n", SourceAddress);
+  }
+
+  // Dummy to empty input buffer to avoid board to stuck with e.g. NMEA Reader
+  if (Serial.available()) 
+  {
+    Serial.read();
+  }
+}
