@@ -15,19 +15,19 @@
 // NMEA2000 Temperature and Barometric Pressure with BMP280
 // Version 0.2, 29.08.2020, AK-Homberger
 
-#define ESP32_CAN_TX_PIN GPIO_NUM_5  // Set CAN TX port to 5 
-#define ESP32_CAN_RX_PIN GPIO_NUM_4  // Set CAN RX port to 4
+#define ESP32_CAN_RX_PIN GPIO_NUM_15 // This line needs to be before #include <NMEA2000_CAN.h> as to define pin used for CAN/NMEA2000 before including the library
+#define ESP32_CAN_TX_PIN GPIO_NUM_2  // This line needs to be before #include <NMEA2000_CAN.h> as to define pin used for CAN/NMEA2000 before including the li 4
 
 #include <Arduino.h>
 #include <Preferences.h>
 #include <NMEA2000_CAN.h>  // This will automatically choose right CAN library and create suitable NMEA2000 object
 #include <N2kMessages.h>
-
+#include <Adafruit_BMP280.h>  // Install Adafruit BMP280 library!!!
 #include <Wire.h>
 
 #define BMP_SDA 2
 #define BMP_SCL 22
-#include <Adafruit_BMP280.h>  // Install Adafruit BMP280 library!!!
+
 Adafruit_BMP280 bmp; // I2C 
 
 // Connect VIN of the BMP280 sensor to 3.3V (NOT 5.0V!)
@@ -52,7 +52,7 @@ const unsigned long TransmitMessages[] PROGMEM = {130310L, // Outside Environmen
 // Send time offsets
 #define TempSendOffset 0
 
-#define SlowDataUpdatePeriod 1000  // Time between CAN Messages sent
+#define SlowDataUpdatePeriod 1000  // Time between CAN Messages sent 1000=1s
 
 
 
